@@ -1,10 +1,26 @@
-import { useState } from 'react';
-import { User, Lock, Globe, Palette, Bell, Brain, Save, CheckCircle, AlertCircle } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { User, Lock, Palette, Brain, Save, CheckCircle, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage, LANGUAGE_NAMES } from '../context/LanguageContext';
 
-const currencies = ['USD', 'EUR', 'GBP', 'INR', 'JPY', 'CAD', 'AUD', 'CNY'];
+const currencies = [
+    { code: 'INR', label: 'INR - Indian Rupee' },
+    { code: 'USD', label: 'USD - US Dollar' },
+    { code: 'EUR', label: 'EUR - Euro' },
+    { code: 'GBP', label: 'GBP - British Pound' },
+    { code: 'JPY', label: 'JPY - Japanese Yen' },
+    { code: 'CAD', label: 'CAD - Canadian Dollar' },
+    { code: 'AUD', label: 'AUD - Australian Dollar' },
+    { code: 'CNY', label: 'CNY - Chinese Yuan' },
+];
+
+const defaultAiPreferences = {
+    spendingAlerts: true,
+    savingsTips: true,
+    weeklyDigest: true,
+    lifestyleInsights: true,
+};
 
 export default function Profile() {
     const { user, updateProfile, changePassword } = useAuth();
@@ -14,14 +30,28 @@ export default function Profile() {
     const [activeTab, setActiveTab] = useState('profile');
     const [profileForm, setProfileForm] = useState({ name: user?.name || '', email: user?.email || '' });
     const [passwordForm, setPasswordForm] = useState({ current: '', newPass: '', confirm: '' });
-    const [currency, setCurrency] = useState(user?.currency || 'USD');
-    const [aiPrefs, setAiPrefs] = useState(user?.aiPreferences || { spendingAlerts: true, savingsTips: true, weeklyDigest: true, lifestyleInsights: true });
+    const [currency, setCurrency] = useState(user?.currency || 'INR');
+    const [aiPrefs, setAiPrefs] = useState(user?.aiPreferences || defaultAiPreferences);
     const [message, setMessage] = useState({ type: '', text: '' });
 
-    const handleProfileSave = () => {
-        updateProfile(profileForm);
-        setMessage({ type: 'success', text: 'Profile updated successfully!' });
-        setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+    useEffect(() => {
+        setProfileForm({ name: user?.name || '', email: user?.email || '' });
+        setCurrency(user?.currency || 'INR');
+        setAiPrefs(user?.aiPreferences || defaultAiPreferences);
+    }, [user]);
+
+    const clearMessageSoon = () => {
+        window.setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+    };
+
+    const handleProfileSave = async () => {
+        try {
+            await updateProfile(profileForm);
+            setMessage({ type: 'success', text: 'Profile updated successfully!' });
+        } catch (err) {
+            setMessage({ type: 'error', text: err.message || 'Failed to update profile' });
+        }
+        clearMessageSoon();
     };
 
     const handlePasswordChange = async () => {
@@ -35,7 +65,36 @@ export default function Profile() {
         } catch (err) {
             setMessage({ type: 'error', text: err.message });
         }
-        setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+        clearMessageSoon();
+    };
+
+    const handleCurrencyChange = async (nextCurrency) => {
+        setCurrency(nextCurrency);
+
+        try {
+            await updateProfile({ currency: nextCurrency });
+            setMessage({ type: 'success', text: `Currency updated to ${nextCurrency}.` });
+        } catch (err) {
+            setCurrency(user?.currency || 'INR');
+            setMessage({ type: 'error', text: err.message || 'Failed to update currency' });
+        }
+
+        clearMessageSoon();
+    };
+
+    const handleLanguageChange = async (nextLanguage) => {
+        const previousLanguage = language;
+        setLanguage(nextLanguage);
+
+        try {
+            await updateProfile({ language: nextLanguage });
+            setMessage({ type: 'success', text: `${LANGUAGE_NAMES[nextLanguage]} language enabled.` });
+        } catch (err) {
+            setLanguage(previousLanguage);
+            setMessage({ type: 'error', text: err.message || 'Failed to update language' });
+        }
+
+        clearMessageSoon();
     };
 
     const tabs = [
@@ -141,14 +200,18 @@ export default function Profile() {
 
                     <div className="form-group">
                         <label className="form-label">Currency</label>
-                        <select className="form-select" value={currency} onChange={e => { setCurrency(e.target.value); updateProfile({ currency: e.target.value }); }}>
-                            {currencies.map(c => <option key={c} value={c}>{c}</option>)}
+                        <select className="form-select" value={currency} onChange={e => handleCurrencyChange(e.target.value)}>
+                            {currencies.map((currencyOption) => (
+                                <option key={currencyOption.code} value={currencyOption.code}>
+                                    {currencyOption.label}
+                                </option>
+                            ))}
                         </select>
                     </div>
 
                     <div className="form-group">
                         <label className="form-label">Language</label>
-                        <select className="form-select" value={language} onChange={e => setLanguage(e.target.value)}>
+                        <select className="form-select" value={language} onChange={e => handleLanguageChange(e.target.value)}>
                             {Object.entries(LANGUAGE_NAMES).map(([code, name]) => (
                                 <option key={code} value={code}>{name}</option>
                             ))}

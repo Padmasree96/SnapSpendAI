@@ -163,6 +163,37 @@ const translations = {
         voiceMessage: 'आपका कुल खर्च है',
         voiceTransactions: 'आपके पास {count} लेनदेन हैं',
     },
+    ta: {
+        dashboard: 'டாஷ்போர்டு',
+        aiImageCapture: 'ஏஐ படப் பதிவு',
+        expenses: 'செலவுகள்',
+        income: 'வருமானம்',
+        accountsWallets: 'கணக்குகள் மற்றும் வாலெட்கள்',
+        budgetPlanning: 'பட்ஜெட் திட்டமிடல்',
+        reportsAnalytics: 'அறிக்கைகள் மற்றும் பகுப்பாய்வு',
+        aiAssistant: 'ஏஐ உதவியாளர்',
+        notifications: 'அறிவிப்புகள்',
+        importExport: 'இறக்குமதி / ஏற்றுமதி',
+        profileSettings: 'சுயவிவரம் மற்றும் அமைப்புகள்',
+        helpSupport: 'உதவி மற்றும் ஆதரவு',
+        logout: 'வெளியேறு',
+        save: 'சேமிக்கவும்',
+        cancel: 'ரத்து செய்',
+        delete: 'நீக்கு',
+        edit: 'திருத்து',
+        add: 'சேர்',
+        search: 'தேடு',
+        loading: 'ஏற்றப்படுகிறது...',
+        expenseManagement: 'செலவு மேலாண்மை',
+        totalExpenses: 'மொத்த செலவுகள்',
+        transactions: 'பரிவர்த்தனைகள்',
+        aiDetected: 'ஏஐ கண்டறிந்தது',
+        addExpense: 'செலவு சேர்',
+        editExpense: 'செலவை திருத்து',
+        announceTotal: 'மொத்த செலவுகளை அறிவி',
+        voiceMessage: 'உங்கள் மொத்த செலவுகள்',
+        voiceTransactions: 'உங்களிடம் {count} பரிவர்த்தனைகள் உள்ளன',
+    },
 };
 
 // Map language code to sidebar nav label keys
@@ -187,6 +218,7 @@ const LANGUAGE_NAMES = {
     fr: 'French',
     de: 'German',
     hi: 'Hindi',
+    ta: 'Tamil',
 };
 
 // Voice language mapping for SpeechSynthesis
@@ -196,6 +228,7 @@ const VOICE_LANG_MAP = {
     fr: 'fr-FR',
     de: 'de-DE',
     hi: 'hi-IN',
+    ta: 'ta-IN',
 };
 
 export { sidebarLabelKeys, LANGUAGE_NAMES, VOICE_LANG_MAP };
@@ -205,9 +238,25 @@ export function LanguageProvider({ children }) {
         return localStorage.getItem('snapspend-language') || 'en';
     });
 
+    useEffect(() => {
+        localStorage.setItem('snapspend-language', language);
+        document.documentElement.lang = VOICE_LANG_MAP[language] || language;
+    }, [language]);
+
+    useEffect(() => {
+        const handleLanguageChange = (event) => {
+            const nextLanguage = event?.detail?.language;
+            if (nextLanguage) {
+                setLanguageState(nextLanguage);
+            }
+        };
+
+        window.addEventListener('snapspend-language-change', handleLanguageChange);
+        return () => window.removeEventListener('snapspend-language-change', handleLanguageChange);
+    }, []);
+
     const setLanguage = (lang) => {
         setLanguageState(lang);
-        localStorage.setItem('snapspend-language', lang);
     };
 
     const t = (key) => {

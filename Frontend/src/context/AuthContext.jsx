@@ -3,6 +3,7 @@ import api from '../services/api';
 import { createBackendUnavailableError, readJsonResponse } from '../services/apiResponse';
 
 const AuthContext = createContext();
+const LANGUAGE_EVENT_NAME = 'snapspend-language-change';
 
 export const useAuth = () => useContext(AuthContext);
 
@@ -10,6 +11,23 @@ export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [token, setToken] = useState(null);
     const [loading, setLoading] = useState(true);
+
+    const syncUserPreferences = (profile) => {
+        if (!profile || typeof window === 'undefined') {
+            return;
+        }
+
+        if (profile.currency) {
+            localStorage.setItem('snapspend-currency', profile.currency);
+        }
+
+        if (profile.language) {
+            localStorage.setItem('snapspend-language', profile.language);
+            window.dispatchEvent(new CustomEvent(LANGUAGE_EVENT_NAME, {
+                detail: { language: profile.language },
+            }));
+        }
+    };
 
     useEffect(() => {
         const savedToken = localStorage.getItem('snapspend-token') || sessionStorage.getItem('snapspend-token');
@@ -21,6 +39,7 @@ export function AuthProvider({ children }) {
             })
                 .then(res => res.ok ? res.json() : Promise.reject())
                 .then(data => {
+                    syncUserPreferences(data);
                     setUser(data);
                     setLoading(false);
                 })
@@ -63,6 +82,7 @@ export function AuthProvider({ children }) {
         }
 
         setToken(data.token);
+        syncUserPreferences(data.user);
         setUser(data.user);
         return { success: true };
     };
@@ -88,6 +108,7 @@ export function AuthProvider({ children }) {
 
         localStorage.setItem('snapspend-token', data.token);
         setToken(data.token);
+        syncUserPreferences(data.user);
         setUser(data.user);
         return { success: true };
     };
@@ -162,6 +183,7 @@ export function AuthProvider({ children }) {
             const msg = data?.detail?.message || data?.message || data?.detail || 'Update failed';
             throw new Error(msg);
         }
+        syncUserPreferences(data);
         setUser(data);
         return { success: true };
     };

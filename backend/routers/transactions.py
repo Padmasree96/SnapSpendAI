@@ -7,6 +7,7 @@ from models.user import User
 from models.transaction import Transaction
 from schemas.transaction import TransactionCreate, TransactionUpdate
 from services.auth_service import get_current_user
+from services.financial_summary_service import build_financial_summary, get_user_financial_entries
 
 router = APIRouter(prefix="/api/transactions", tags=["Transactions"])
 
@@ -131,24 +132,16 @@ def get_summary(
     db: Session = Depends(get_db),
 ):
     """Get monthly summary statistics."""
-    transactions = db.query(Transaction).filter(Transaction.user_id == user.id).all()
-
-    total_income = sum(t.amount for t in transactions if t.type == "income")
-    total_expenses = sum(t.amount for t in transactions if t.type == "expense")
-    ai_detected = len([t for t in transactions if t.ai_detected])
-
-    # Category breakdown
-    categories = {}
-    for t in transactions:
-        if t.type == "expense":
-            categories[t.category] = categories.get(t.category, 0) + t.amount
+    entries = get_user_financial_entries(user.id, db)
+    summary = build_financial_summary(entries)
+    ai_detected = len([entry for entry in entries if entry.get("aiDetected")])
 
     return {
-        "totalBalance": round(total_income - total_expenses, 2),
-        "monthlyIncome": round(total_income, 2),
-        "monthlyExpenses": round(total_expenses, 2),
-        "savings": round(total_income - total_expenses, 2),
-        "transactionCount": len(transactions),
+        "totalBalance": summary["netBalance"],
+        "monthlyIncome": summary["totalIncome"],
+        "monthlyExpenses": summary["totalExpenses"],
+        "savings": summary["netBalance"],
+        "transactionCount": len(entries),
         "aiDetectedCount": ai_detected,
-        "categoryBreakdown": categories,
+        "categoryBreakdown": summary["categoryBreakdown"],
     }

@@ -126,18 +126,89 @@ export const mockFAQs = [
     { q: 'What is Spending Personality?', a: 'Spending Personality is an AI-generated profile based on your financial behavior. It considers your spending patterns, saving habits, impulse buying tendency, and lifestyle choices to give you a comprehensive personality assessment.' },
 ];
 
-export const formatCurrency = (amount, currency = 'USD') => {
-    return new Intl.NumberFormat('en-US', {
+const STORAGE_CURRENCY_KEY = 'snapspend-currency';
+const STORAGE_LANGUAGE_KEY = 'snapspend-language';
+
+const LANGUAGE_LOCALE_MAP = {
+    en: 'en-US',
+    es: 'es-ES',
+    fr: 'fr-FR',
+    de: 'de-DE',
+    hi: 'hi-IN',
+    ta: 'ta-IN',
+};
+
+const CURRENCY_LOCALE_MAP = {
+    USD: 'en-US',
+    EUR: 'de-DE',
+    GBP: 'en-GB',
+    INR: 'en-IN',
+    JPY: 'ja-JP',
+    CAD: 'en-CA',
+    AUD: 'en-AU',
+    CNY: 'zh-CN',
+};
+
+function getStoredPreference(key) {
+    if (typeof window === 'undefined') {
+        return null;
+    }
+
+    return window.localStorage.getItem(key);
+}
+
+export const getPreferredCurrency = () => {
+    return getStoredPreference(STORAGE_CURRENCY_KEY) || 'INR';
+};
+
+export const getPreferredLocale = () => {
+    const language = getStoredPreference(STORAGE_LANGUAGE_KEY);
+    if (language && LANGUAGE_LOCALE_MAP[language]) {
+        return LANGUAGE_LOCALE_MAP[language];
+    }
+
+    const currency = getPreferredCurrency();
+    return CURRENCY_LOCALE_MAP[currency] || 'en-IN';
+};
+
+export const formatCurrency = (amount, currency = getPreferredCurrency()) => {
+    const numericAmount = Number(amount) || 0;
+
+    return new Intl.NumberFormat(getPreferredLocale(), {
         style: 'currency',
         currency,
         minimumFractionDigits: 0,
         maximumFractionDigits: 2,
-    }).format(amount);
+    }).format(numericAmount);
 };
 
 export const formatDate = (dateStr) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    if (!dateStr) {
+        return '';
+    }
+
+    const isoDate = String(dateStr).split('T')[0];
+    const [year, month, day] = isoDate.split('-').map(Number);
+
+    let date = null;
+    if (year && month && day) {
+        date = new Date(year, month - 1, day);
+    } else {
+        const parsed = new Date(dateStr);
+        if (!Number.isNaN(parsed.getTime())) {
+            date = parsed;
+        }
+    }
+
+    if (!date) {
+        return String(dateStr);
+    }
+
+    return new Intl.DateTimeFormat(getPreferredLocale(), {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+    }).format(date);
 };
 
 export const getCategoryInfo = (categoryId) => {

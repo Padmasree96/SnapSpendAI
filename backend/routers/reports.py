@@ -9,91 +9,17 @@ from database import get_db
 from models.transaction import Transaction
 from models.user import User
 from services.auth_service import get_current_user
-
-router = APIRouter(prefix="/api/reports", tags=["Reports & Analytics"])
-
-SUPPORTED_DATE_FORMATS = (
-    "%Y-%m-%d",
-    "%Y-%m-%d %H:%M:%S",
-    "%m/%d/%Y",
-    "%m-%d-%Y",
-    "%d/%m/%Y",
-    "%d-%m-%Y",
+from services.financial_summary_service import (
+    build_financial_summary,
+    get_user_financial_entries,
+    group_entries_by_month,
+    normalize_category,
+    normalize_transaction_type,
+    parse_financial_date,
+    serialize_monthly_totals,
 )
 
-
-def _parse_transaction_date(raw_date: Optional[str]) -> Optional[datetime]:
-    if raw_date is None:
-        return None
-
-    if isinstance(raw_date, datetime):
-        return raw_date
-
-    value = str(raw_date).strip()
-    if not value:
-        return None
-
-    try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
-        pass
-
-    for date_format in SUPPORTED_DATE_FORMATS:
-        try:
-            return datetime.strptime(value, date_format)
-        except ValueError:
-            continue
-
-    return None
-
-
-def _normalize_transaction_type(transaction_type: Optional[str]) -> Optional[str]:
-    normalized = str(transaction_type or "").strip().lower()
-    if normalized in {"income", "expense"}:
-        return normalized
-    return None
-
-
-def _normalize_category(category: Optional[str]) -> str:
-    normalized = str(category or "").strip().lower()
-    return normalized or "others"
-
-
-def _month_label(year: int, month: int) -> str:
-    return datetime(year, month, 1).strftime("%b %Y")
-
-
-def _group_transactions_by_month(transactions):
-    monthly = defaultdict(lambda: {"income": 0.0, "expenses": 0.0})
-
-    for transaction in transactions:
-        transaction_date = _parse_transaction_date(transaction.date)
-        transaction_type = _normalize_transaction_type(transaction.type)
-        if transaction_date is None or transaction_type is None:
-            continue
-
-        month_key = (transaction_date.year, transaction_date.month)
-        monthly[month_key]["income" if transaction_type == "income" else "expenses"] += float(transaction.amount or 0)
-
-    return monthly
-
-
-def _serialize_monthly_totals(monthly):
-    result = []
-
-    for (year, month) in sorted(monthly.keys()):
-        data = monthly[(year, month)]
-        income = round(data["income"], 2)
-        expenses = round(data["expenses"], 2)
-        savings = round(income - expenses, 2)
-        result.append({
-            "month": _month_label(year, month),
-            "income": income,
-            "expenses": expenses,
-            "savings": savings,
-        })
-
-    return result
+router = APIRouter(prefix="/api/reports", tags=["Reports & Analytics"])
 
 
 def _parse_month_filter(month: Optional[str]):
@@ -114,9 +40,8 @@ def monthly_report(
     db: Session = Depends(get_db),
 ):
     """Monthly income/expense/savings report."""
-    transactions = db.query(Transaction).filter(Transaction.user_id == user.id).all()
-    monthly = _group_transactions_by_month(transactions)
-    return _serialize_monthly_totals(monthly)
+    entries = get_user_financial_entries(user.id, db)
+    return serialize_monthly_totals(group_entries_by_month(entries))
 
 
 @router.get("/category-spending")
@@ -147,13 +72,13 @@ def category_spending(
 
     categories = {}
     for transaction in transactions:
-        transaction_date = _parse_transaction_date(transaction.date)
+        transaction_date = parse_financial_date(transaction.date)
         if transaction_date is None:
             continue
         if month_filter and (transaction_date.year, transaction_date.month) != month_filter:
             continue
 
-        category_key = _normalize_category(transaction.category)
+        category_key = normalize_category(transaction.category)
         categories[category_key] = categories.get(category_key, 0) + float(transaction.amount or 0)
 
     result = []
@@ -182,7 +107,7 @@ def daily_spending(
     daily = {d: 0 for d in day_names}
 
     for transaction in transactions:
-        transaction_date = _parse_transaction_date(transaction.date)
+        transaction_date = parse_financial_date(transaction.date)
         if transaction_date is None:
             continue
 
@@ -198,15 +123,15 @@ def savings_trend(
     db: Session = Depends(get_db),
 ):
     """Savings trend over months."""
-    transactions = db.query(Transaction).filter(Transaction.user_id == user.id).all()
-    monthly = _group_transactions_by_month(transactions)
+    entries = get_user_financial_entries(user.id, db)
+    monthly = group_entries_by_month(entries)
     return [
         {
             "month": item["month"],
             "savings": item["savings"],
             "target": 1500,
         }
-        for item in _serialize_monthly_totals(monthly)
+        for item in serialize_monthly_totals(monthly)
     ]
 
 
@@ -218,25 +143,23 @@ def yearly_report(
 ):
     """Annual income/expense/savings summary."""
     target_year = int(year) if year and year.isdigit() else datetime.utcnow().year
-    all_transactions = db.query(Transaction).filter(Transaction.user_id == user.id).all()
-    transactions = []
-    for transaction in all_transactions:
-        transaction_date = _parse_transaction_date(transaction.date)
-        if transaction_date and transaction_date.year == target_year:
-            transactions.append(transaction)
-
-    total_income = sum(float(t.amount or 0) for t in transactions if _normalize_transaction_type(t.type) == "income")
-    total_expenses = sum(float(t.amount or 0) for t in transactions if _normalize_transaction_type(t.type) == "expense")
-    savings = total_income - total_expenses
-
-    monthly_data = _serialize_monthly_totals(_group_transactions_by_month(transactions))
+    all_entries = get_user_financial_entries(user.id, db)
+    entries = [
+        entry for entry in all_entries
+        if entry.get("parsed_date") and entry["parsed_date"].year == target_year
+    ]
+    summary = build_financial_summary(entries)
+    total_income = summary["totalIncome"]
+    total_expenses = summary["totalExpenses"]
+    savings = summary["netBalance"]
+    monthly_data = summary["monthly"]
 
     # Category summary
     categories = {}
-    for transaction in transactions:
-        if _normalize_transaction_type(transaction.type) == "expense":
-            category_key = _normalize_category(transaction.category)
-            categories[category_key] = categories.get(category_key, 0) + float(transaction.amount or 0)
+    for entry in entries:
+        if entry.get("type") == "expense":
+            category_key = normalize_category(entry.get("category"))
+            categories[category_key] = categories.get(category_key, 0) + float(entry.get("amount") or 0)
 
     return {
         "year": str(target_year),
@@ -244,7 +167,7 @@ def yearly_report(
         "totalExpenses": round(total_expenses, 2),
         "netSavings": round(savings, 2),
         "savingsRate": round(savings / max(total_income, 1) * 100, 1),
-        "transactionCount": len(transactions),
+        "transactionCount": len(entries),
         "avgMonthlyExpense": round(total_expenses / 12, 2),
         "avgMonthlyIncome": round(total_income / 12, 2),
         "monthly": monthly_data,
@@ -258,14 +181,14 @@ def income_vs_expense(
     db: Session = Depends(get_db),
 ):
     """Income vs expense comparison with ratios."""
-    transactions = db.query(Transaction).filter(Transaction.user_id == user.id).all()
-
-    total_income = sum(float(t.amount or 0) for t in transactions if _normalize_transaction_type(t.type) == "income")
-    total_expenses = sum(float(t.amount or 0) for t in transactions if _normalize_transaction_type(t.type) == "expense")
-    savings = total_income - total_expenses
+    entries = get_user_financial_entries(user.id, db)
+    summary = build_financial_summary(entries)
+    total_income = summary["totalIncome"]
+    total_expenses = summary["totalExpenses"]
+    savings = summary["netBalance"]
 
     comparison = []
-    for item in _serialize_monthly_totals(_group_transactions_by_month(transactions)):
+    for item in summary["monthly"]:
         comparison.append({
             "month": item["month"],
             "income": item["income"],
@@ -298,7 +221,7 @@ def lifestyle_costs(
     total_spent = sum(t.amount for t in transactions)
     categories = {}
     for transaction in transactions:
-        category_key = _normalize_category(transaction.category)
+        category_key = normalize_category(transaction.category)
         categories[category_key] = categories.get(category_key, 0) + float(transaction.amount or 0)
 
     # Categorize into lifestyle groups
