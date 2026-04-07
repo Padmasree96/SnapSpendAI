@@ -1,0 +1,31 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+sqlalchemy>=2.0.36
+pydantic>=2.10.0
+pydantic-settings>=2.6.0
+python-jose[cryptography]>=3.3.0
+passlib>=1.7.4
+bcrypt>=4.0.0
+python-multipart>=0.0.12
+aiofiles>=24.1.0
+pillow>=11.1.0
+# AI & RAG
+langchain>=0.3.0
+langchain-openai>=0.2.0
+langchain-community>=0.3.0
+faiss-cpu>=1.8.0
+openai>=1.50.0
+google-generativeai>=0.8.0
+pytesseract>=0.3.13
+opencv-python-headless>=4.10.0
+rapidocr-onnxruntime>=1.2.3
+pypdf>=5.1.0
+pandas>=2.2.0
+gTTS>=2.5.0
+# Data export
+openpyxl>=3.1.5
+fpdf2>=2.8.0
+# Utilities
+python-dateutil>=2.9.0
+apscheduler>=3.10.4
+cryptography>=43.0.0

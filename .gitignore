@@ -1,0 +1,36 @@
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+env/
+
+# Backend runtime data
+backend/.env
+backend/uploads/
+backend/*.db
+backend/*.sqlite
+backend/*.sqlite3
+backend/faiss_index_local.json
+backend/rag_upload_out*.txt
+
+# Node / frontend
+Frontend/node_modules/
+Frontend/dist/
+Frontend/build*.txt
+npm-debug.log*
+yarn-error.log*
+
+# Local logs
+*.log
