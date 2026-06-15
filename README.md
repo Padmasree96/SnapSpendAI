@@ -145,18 +145,3 @@ Real-time notifications
 👨‍💻 Author
 
 Padmasree Rajavel
-
-Made with ❤️ using AI and Data Analytics
-
-
----
-
-# Create Repository and Push to GitHub
-
-### Step 1: Create Repository on GitHub
-
-Repository Name:
-
-```text
-SnapSpend-AI
-
