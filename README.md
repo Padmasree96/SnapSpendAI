@@ -87,28 +87,7 @@ SnapSpend-AI/
 └── README.md
 
 
-## ⚙️ Installation
 
-### Clone Repository
-
-```bash
-git clone https://github.com/yourusername/SnapSpend-AI.git
-cd SnapSpend-AI
-Create Virtual Environment
-python -m venv venv
-Activate Virtual Environment
-
-Windows:
-
-venv\Scripts\activate
-
-Linux/Mac:
-
-source venv/bin/activate
-Install Dependencies
-pip install -r requirements.txt
-Run Application
-python app.py
 📊 Core Modules
 Expense Management Module
 
